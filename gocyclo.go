@@ -15,6 +15,7 @@
 //      -avg      show the average complexity
 //      -short    only print the average without additional
 //                formatting or output, ignores all other options
+//      -skiptest skip test files when calculating complexity
 //
 // The output fields for each line are:
 // <complexity> <package> <function> <file:row:column>
@@ -46,6 +47,7 @@ Flags:
                   not depending on whether -over or -top are set
         -short    only print the average without additional
                   formatting or output, ignores all other options
+        -skiptest skip test files when calculating complexity
 
 The output fields for each line are:
 <complexity> <package> <function> <file:row:column>
@@ -57,10 +59,11 @@ func usage() {
 }
 
 var (
-	over  = flag.Int("over", 0, "show functions with complexity > N only")
-	top   = flag.Int("top", -1, "show the top N most complex functions only")
-	avg   = flag.Bool("avg", false, "show the average complexity")
-	short = flag.Bool("short", false, "only show average complexity")
+	over      = flag.Int("over", 0, "show functions with complexity > N only")
+	top       = flag.Int("top", -1, "show the top N most complex functions only")
+	avg       = flag.Bool("avg", false, "show the average complexity")
+	short     = flag.Bool("short", false, "only show average complexity")
+	skipTests = flag.Bool("skiptest", false, "skip tests in analysis")
 )
 
 func main() {
@@ -95,10 +98,20 @@ func analyze(paths []string) []stat {
 		if isDir(path) {
 			stats = analyzeDir(path, stats)
 		} else {
+			if *skipTests && isTest(path) {
+				continue
+			}
 			stats = analyzeFile(path, stats)
 		}
 	}
 	return stats
+}
+
+func isTest(filename string) bool {
+	base := filepath.Base(filename)
+	ext := filepath.Ext(filename)
+	name := strings.TrimSuffix(base, ext)
+	return strings.HasSuffix(name, "_test")
 }
 
 func isDir(filename string) bool {
@@ -118,6 +131,9 @@ func analyzeFile(fname string, stats []stat) []stat {
 func analyzeDir(dirname string, stats []stat) []stat {
 	filepath.Walk(dirname, func(path string, info os.FileInfo, err error) error {
 		if err == nil && !info.IsDir() && strings.HasSuffix(path, ".go") {
+			if *skipTests && isTest(path) {
+				return nil
+			}
 			stats = analyzeFile(path, stats)
 		}
 		return err
